@@ -7,7 +7,7 @@ const char* ssid = "EASTLINK861";           // Replace with your Wi-Fi SSID
 const char* password = "44Okunola?1#";   // Replace with your Wi-Fi password
 
 // MQTT broker information
-const char* mqtt_server = "Your_Raspberry_Pi_IP";  // Replace with your Raspberry Pi's IP address
+const char* mqtt_server = "192.168.6.25 fd0c:3ecd:9225:1:46ea:e1c2:202b:9bdf";  // Replace with your Raspberry Pi's IP address
 
 // DHT22 sensor setup
 #define DHTPIN 2               // GPIO pin where the DHT22 is connected
