@@ -10,12 +10,12 @@ const char* password = "44Okunola?1#";   // Replace with your Wi-Fi password
 const char* mqtt_server = "192.168.6.25 fd0c:3ecd:9225:1:46ea:e1c2:202b:9bdf";  // Replace with your Raspberry Pi's IP address
 
 // DHT22 sensor setup
-#define DHTPIN 2               // GPIO pin where the DHT22 is connected
+#define DHTPIN 7               // GPIO pin where the DHT22 is connected
 #define DHTTYPE DHT22          // Define the sensor type (DHT22)
 DHT dht(DHTPIN, DHTTYPE);      // Create a DHT sensor object
 
 // Relay setup
-#define RELAY_PIN 5            // GPIO pin connected to the relay module
+#define RELAY_PIN 0            // GPIO pin connected to the relay module
 
 // Wi-Fi and MQTT client setup
 WiFiClient espClient;          // Wi-Fi client object
@@ -48,7 +48,7 @@ void reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect("ESP32Client_Esthersroom")) {
+    if (client.connect("ESP32Client_Sksroom")) {
       Serial.println("connected");
       // Once connected, you can subscribe to topics if needed
     } else {
@@ -90,14 +90,14 @@ void loop() {
 
   // Control the relay based on humidity levels
   if (humidity > 63) {
-    digitalWrite(RELAY_PIN, LOW);  // Turn on the relay (dehumidifier) if humidity > 60% (Made it 63% to allow room for any tolerance)
+    digitalWrite(RELAY_PIN, LOW);  // Turn on the relay (dehumidifier) if humidity > 60%(Made it 63% to allow room for any tolerance)
   } else if (humidity < 48) {
-    digitalWrite(RELAY_PIN, HIGH);   // Turn off the relay (dehumidifier) if humidity < 50% (Made it 48% to allow room for any tolerance)
+    digitalWrite(RELAY_PIN, HIGH);   // Turn off the relay (dehumidifier) if humidity < 50%(Made it 48% to allow room for any tolerance)
   }
 
   // Publish the humidity reading to the MQTT broker
   String payload = String(humidity);
-  client.publish("home/Esthersroom/humidity", payload.c_str());
+  client.publish("home/Sksroom/humidity", payload.c_str());
 
   delay(2000);  // Wait 2 seconds before the next reading
 }

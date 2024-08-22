@@ -66,7 +66,7 @@ void reconnect() {
 void setup() {
   Serial.begin(115200);               // Start the serial monitor
   pinMode(RELAY_PIN, OUTPUT);         // Set the relay pin as output
-  digitalWrite(RELAY_PIN, LOW);       // Ensure the relay is off at startup
+  digitalWrite(RELAY_PIN, HIGH);       // Ensure the relay is off at startup(HIGH for low-level trigger)
   setup_wifi();                       // Connect to the Wi-Fi network
   client.setServer(mqtt_server, 1883); // Set the MQTT broker IP and port
   dht.begin();                        // Initialize the DHT22 sensor
@@ -90,9 +90,9 @@ void loop() {
 
   // Control the relay based on humidity levels
   if (humidity > 63) {
-    digitalWrite(RELAY_PIN, HIGH);  // Turn on the relay (dehumidifier) if humidity > 60%
+    digitalWrite(RELAY_PIN, LOW);  // Turn on the relay (dehumidifier) if humidity > 60% (Made it 63% to allow room for any tolerance)
   } else if (humidity < 48) {
-    digitalWrite(RELAY_PIN, LOW);   // Turn off the relay (dehumidifier) if humidity < 50%
+    digitalWrite(RELAY_PIN, HIGH);   // Turn off the relay (dehumidifier) if humidity < 50% (Made it 48% to allow room for any tolerance)
   }
 
   // Publish the humidity reading to the MQTT broker
