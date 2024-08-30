@@ -1,28 +1,28 @@
+#include <Wire.h>               // Library for I2C communication
 #include <WiFi.h>               // Library for Wi-Fi connectivity
 #include <PubSubClient.h>       // Library for MQTT communication
-#include <DHT.h>                // Library for interfacing with the DHT sensor
+#include <Adafruit_AHTX0.h>     // Library for the DHT20 sensor
+#include <HardwareSerial.h>
+
+Adafruit_AHTX0 dht20;           // Initialize the DHT20 sensor object
 
 // Wi-Fi credentials
 const char* ssid = "EASTLINK861";           // Replace with your Wi-Fi SSID
-const char* password = "44Okunola?1#";   // Replace with your Wi-Fi password
+const char* password = "44Okunola?1#";      // Replace with your Wi-Fi password
 
 // MQTT broker information
-const char* mqtt_server = "192.168.6.25 fd0c:3ecd:9225:1:46ea:e1c2:202b:9bdf";  // Replace with your Raspberry Pi's IP address
-
-// DHT22 sensor setup
-#define DHTPIN 7               // GPIO pin where the DHT22 is connected
-#define DHTTYPE DHT22          // Define the sensor type (DHT22)
-DHT dht(DHTPIN, DHTTYPE);      // Create a DHT sensor object
+const char* mqtt_server = "192.168.6.25";   // Replace with your Raspberry Pi's IP address
 
 // Relay setup
-#define RELAY_PIN 0            // GPIO pin connected to the relay module
+#define RELAY_PIN 6            // GPIO pin connected to the relay module
 
 // Wi-Fi and MQTT client setup
-WiFiClient espClient;          // Wi-Fi client object
-PubSubClient client(espClient); // MQTT client object using the Wi-Fi client
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+HardwareSerial mySerial(1); // Use Serial1 or another UART
 
 // Function: setup_wifi
-// Description: Connects the ESP32/ESP8266 to the Wi-Fi network.
 void setup_wifi() {
   delay(10);
   Serial.println();
@@ -31,7 +31,6 @@ void setup_wifi() {
 
   WiFi.begin(ssid, password); // Initiate Wi-Fi connection
 
-  // Wait until the Wi-Fi is connected
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -42,61 +41,64 @@ void setup_wifi() {
 }
 
 // Function: reconnect
-// Description: Reconnects to the MQTT broker if the connection is lost.
 void reconnect() {
-  // Loop until we're reconnected
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
-    // Attempt to connect
     if (client.connect("ESP32Client_Sksroom")) {
       Serial.println("connected");
-      // Once connected, you can subscribe to topics if needed
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" trying again in 5 seconds");
-      // Wait 5 seconds before retrying
       delay(5000);
     }
   }
 }
 
 // Function: setup
-// Description: Initializes the sensor, relay, and sets up Wi-Fi and MQTT connections.
 void setup() {
-  Serial.begin(115200);               // Start the serial monitor
-  pinMode(RELAY_PIN, OUTPUT);         // Set the relay pin as output
-  digitalWrite(RELAY_PIN, HIGH);       // Ensure the relay is off at startup(HIGH for low-level trigger)
-  setup_wifi();                       // Connect to the Wi-Fi network
-  client.setServer(mqtt_server, 1883); // Set the MQTT broker IP and port
-  dht.begin();                        // Initialize the DHT22 sensor
+  Serial.begin(115200);
+  while (!Serial) {
+    delay(10);  // Wait until the serial connection is established
+  }
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, HIGH);  // Ensure the relay is off at startup
+  setup_wifi();                   // Connect to the Wi-Fi network
+  client.setServer(mqtt_server, 1883);
+
+  // Set up I2C communication with custom pins
+  Wire.begin(8, 9); // SDA on GPIO 8, SCL on GPIO 9
+
+  if (!dht20.begin()) {
+    Serial.println("Failed to start DHT20 sensor!");
+    while (1);  // Halt if the sensor doesn't initialize
+  }
+
+  // Initialize the secondary serial port (must be done in setup)
+  mySerial.begin(115200, SERIAL_8N1, 43, 44);  // Replace 43 and 44 with your actual TX and RX GPIO numbers
 }
 
 // Function: loop
-// Description: Continuously reads humidity, controls the relay based on thresholds, and sends data via MQTT.
 void loop() {
-  if (!client.connected()) {   // Reconnect to MQTT if the connection is lost
+  if (!client.connected()) {
     reconnect();
   }
-  client.loop();               // Ensure the MQTT client processes incoming messages
+  client.loop();
 
-  float humidity = dht.readHumidity(); // Read humidity from the DHT22 sensor
+  sensors_event_t humidityEvent, tempEvent;
+  dht20.getEvent(&humidityEvent, &tempEvent);  // Read data from the DHT20 sensor
 
-  // Check if the reading is valid
-  if (isnan(humidity)) {
-    Serial.println("Failed to read from DHT sensor!");
-    return;
+  Serial.println("Starting humidity monitoring...");  // Add at the beginning of loop()
+  Serial.print("Humidity: ");
+  Serial.println(humidityEvent.relative_humidity);
+
+  if (humidityEvent.relative_humidity > 63) {
+    digitalWrite(RELAY_PIN, LOW);  // Turn on the relay (dehumidifier) if humidity > 63%
+  } else if (humidityEvent.relative_humidity < 48) {
+    digitalWrite(RELAY_PIN, HIGH); // Turn off the relay (dehumidifier) if humidity < 48%
   }
 
-  // Control the relay based on humidity levels
-  if (humidity > 63) {
-    digitalWrite(RELAY_PIN, LOW);  // Turn on the relay (dehumidifier) if humidity > 60%(Made it 63% to allow room for any tolerance)
-  } else if (humidity < 48) {
-    digitalWrite(RELAY_PIN, HIGH);   // Turn off the relay (dehumidifier) if humidity < 50%(Made it 48% to allow room for any tolerance)
-  }
-
-  // Publish the humidity reading to the MQTT broker
-  String payload = String(humidity);
+  String payload = String(humidityEvent.relative_humidity);
   client.publish("home/Sksroom/humidity", payload.c_str());
 
   delay(2000);  // Wait 2 seconds before the next reading
