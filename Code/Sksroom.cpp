@@ -4,10 +4,10 @@
 
 // Wi-Fi credentials
 const char* ssid = "EASTLINK861";           // Replace with your Wi-Fi SSID
-const char* password = "44Okunola?1#";   // Replace with your Wi-Fi password
+const char* password = "44Okunola?1#";      // Replace with your Wi-Fi password
 
 // MQTT broker information
-const char* mqtt_server = "192.168.6.25 fd0c:3ecd:9225:1:46ea:e1c2:202b:9bdf";  // Replace with your Raspberry Pi's IP address
+const char* mqtt_server = "192.168.6.25";   // Replace with your Raspberry Pi's IP address
 
 // DHT22 sensor setup
 #define DHTPIN 2               // GPIO pin where the DHT22 is connected
@@ -21,8 +21,9 @@ DHT dht(DHTPIN, DHTTYPE);      // Create a DHT sensor object
 WiFiClient espClient;          // Wi-Fi client object
 PubSubClient client(espClient); // MQTT client object using the Wi-Fi client
 
-// Function: setup_wifi
-// Description: Connects the ESP32/ESP8266 to the Wi-Fi network.
+// Light sleep duration (5 minutes in microseconds)
+const uint64_t SLEEP_INTERVAL = 300000000;
+
 void setup_wifi() {
   delay(10);
   Serial.println();
@@ -41,46 +42,42 @@ void setup_wifi() {
   Serial.println("WiFi connected");
 }
 
-// Function: reconnect
-// Description: Reconnects to the MQTT broker if the connection is lost.
+// Reconnects to the MQTT broker if the connection is lost
 void reconnect() {
-  // Loop until we're reconnected
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
-    // Attempt to connect
     if (client.connect("ESP32Client_Sksroom")) {
       Serial.println("connected");
-      // Once connected, you can subscribe to topics if needed
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" trying again in 5 seconds");
-      // Wait 5 seconds before retrying
       delay(5000);
     }
   }
 }
 
-// Function: setup
-// Description: Initializes the sensor, relay, and sets up Wi-Fi and MQTT connections.
 void setup() {
   Serial.begin(115200);               // Start the serial monitor
   pinMode(RELAY_PIN, OUTPUT);         // Set the relay pin as output
-  digitalWrite(RELAY_PIN, HIGH);       // Ensure the relay is off at startup(HIGH for low-level trigger)
+  digitalWrite(RELAY_PIN, HIGH);      // Ensure the relay is off at startup (HIGH for low-level trigger)
   setup_wifi();                       // Connect to the Wi-Fi network
   client.setServer(mqtt_server, 1883); // Set the MQTT broker IP and port
   dht.begin();                        // Initialize the DHT22 sensor
+
+  // Set up the light sleep wake-up interval
+  esp_sleep_enable_timer_wakeup(SLEEP_INTERVAL);
 }
 
-// Function: loop
-// Description: Continuously reads humidity, controls the relay based on thresholds, and sends data via MQTT.
 void loop() {
-  if (!client.connected()) {   // Reconnect to MQTT if the connection is lost
+  // Reconnect to MQTT if the connection is lost
+  if (!client.connected()) {
     reconnect();
   }
-  client.loop();               // Ensure the MQTT client processes incoming messages
+  client.loop();  // Ensure the MQTT client processes incoming messages
 
-  float humidity = dht.readHumidity(); // Read humidity from the DHT22 sensor
+  // Read humidity from the DHT22 sensor
+  float humidity = dht.readHumidity();
 
   // Check if the reading is valid
   if (isnan(humidity)) {
@@ -89,15 +86,26 @@ void loop() {
   }
 
   // Control the relay based on humidity levels
+  String relayStatus = "OFF";  // Default relay status
   if (humidity > 63) {
-    digitalWrite(RELAY_PIN, LOW);  // Turn on the relay (dehumidifier) if humidity > 60% (Made it 63% to allow room for any tolerance)
+    digitalWrite(RELAY_PIN, LOW);  // Turn on the relay (dehumidifier) if humidity > 63%
+    relayStatus = "ON";
   } else if (humidity < 48) {
-    digitalWrite(RELAY_PIN, HIGH);   // Turn off the relay (dehumidifier) if humidity < 50% (Made it 48% to allow room for any tolerance)
+    digitalWrite(RELAY_PIN, HIGH); // Turn off the relay (dehumidifier) if humidity < 48%
+    relayStatus = "OFF";
   }
 
-  // Publish the humidity reading to the MQTT broker
-  String payload = String(humidity);
+  // Publish the humidity and relay status as a single message to the MQTT broker
+  String payload = "Humidity: " + String(humidity) + " %, Relay: " + relayStatus;
   client.publish("home/Sksroom/humidity", payload.c_str());
 
-  delay(2000);  // Wait 2 seconds before the next reading
+  // Print humidity and relay status
+  Serial.print("Humidity: ");
+  Serial.print(humidity);
+  Serial.print(" %, Relay Status: ");
+  Serial.println(relayStatus);
+
+  // Go into light sleep for 5 minutes
+  Serial.println("Entering light sleep for 5 minutes...");
+  esp_light_sleep_start();  // Enter light sleep mode
 }

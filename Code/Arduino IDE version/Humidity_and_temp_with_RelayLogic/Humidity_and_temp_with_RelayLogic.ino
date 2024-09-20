@@ -9,8 +9,8 @@ Adafruit_AHTX0 aht;
 #define RELAY_PIN 7
 
 // Define the humidity thresholds
-#define HUMIDITY_THRESHOLD_HIGH 63.0  // Turn on the relay (dehumidifier) if humidity > 63%
-#define HUMIDITY_THRESHOLD_LOW 48.0   // Turn off the relay (dehumidifier) if humidity < 48%
+#define HUMIDITY_THRESHOLD_HIGH 64.0  // Turn on the relay (dehumidifier) if humidity > 64%
+#define HUMIDITY_THRESHOLD_LOW 54.5   // Turn off the relay (dehumidifier) if humidity < 55%
 
 // Define the debounce delay in milliseconds
 #define DEBOUNCE_DELAY 5000  // 5 seconds
